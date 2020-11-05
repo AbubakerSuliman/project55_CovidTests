@@ -37,3 +37,12 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+1_data/
+2_programs/*.html
+2_programs/*.pdf
+2_programs/*.tex
+3_results/
+4_publications/
+
+
