@@ -149,89 +149,8 @@ number_comorbid_cat3 = case_when(number_comorbid_num <= 0 ~ '0',
 
 number_comorbid_cat3 = factor(number_comorbid_cat3, ordered = TRUE, levels = c("0","1",">= 2"), labels = c("0","1",">= 2")),
 
-
-#2. Oxygen#
-#########################################
-#2.1. Oxygen therapy close to start_date#
-#########################################
-
-# v_ox_therapy = case_when(v_ox_therapy %in% cat1 ~ "1",v_ox_therapy %in%  cat2 ~ "2" , v_ox_therapy %in% cat3 ~ "3",  v_ox_therapy %in% cat4 ~ "4", TRUE ~ NA_character_),
-# v_ox_therapy_ord = factor(v_ox_therapy, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-# #2.2. Oxygen therapy max at 12 and 24h#
-# ox_th_24_max_code_ord = factor(ox_th_24_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-# ox_th_12_max_code_ord = factor(ox_th_12_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-
-#################################################
-#2.3. Oxygen therapy titrated close to start_date
-#################################################
-
-# v_ox_therapy_titrated = case_when(v_Oxygen_Therapy_Titrated %in% cat1 ~ "1",v_ox_therapy %in%  cat2 ~ "2" , v_ox_therapy %in% cat3 ~ "3",  v_ox_therapy %in% cat4 ~ "4", TRUE ~ NA_character_),
-# v_ox_therapy_titrated_ord = factor(v_ox_therapy_titrated, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-# 
-# #2.3. Oxygen therapy titrated max at 12 and 24h#
-# ox_th_tit_24_max_code_ord = factor(ox_th_tit_24_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-# ox_th_tit_12_max_code_ord = factor(ox_th_tit_12_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
-# 
-#######################
-#2.4. Oxygen flow rate#
-#######################
-
-# v_oxygen_status = case_when(v_ox_flow_rate == 0 ~ 'Not requiring oxygen',
-#           v_ox_flow_rate > 0 ~ 'Requiring oxygen',
-#           TRUE ~ NA_character_),
-# #2.4. Oxygen flow rate max at 12 and 24h#
-# oxygen_status_12_max = case_when(ox_flow_12_max_value == 0 ~ 'Not requiring SO',
-#           v_ox_flow_rate > 0 ~ 'Requiring SO',
-#           TRUE ~ NA_character_),
-# oxygen_status_24_max = case_when(ox_flow_24_max_value == 0 ~ 'Not requiring SO',
-#           v_ox_flow_rate > 0 ~ 'Requiring SO',
-#           TRUE ~ NA_character_),
-
-#### Vitals ##############
-# v_mews_tot = case_when(v_mews_tot <= 4 ~ '1',v_mews_tot %in% c('5','6') ~ '2', v_mews_tot >= 7 ~ '3', TRUE ~ NA_character_) ,
-# v_mews_tot = factor(v_mews_tot, ordered = TRUE, levels = c("1","2","3"), labels = c("Low","Medium","High")),
-# 
-# spo2_94 = case_when(v_spo2 <= 94 ~ '< 94',
-#                            v_spo2 > 94 ~ '> 94',
-#                       TRUE ~ NA_character_),
-# spo2_90 = case_when(v_spo2 < 90 ~ '< 90',
-#                            v_spo2 >= 90 ~ '> 90',
-#                       TRUE ~ NA_character_),
-# spo2_cat3 = case_when(v_spo2 < 90 ~ '< 90',
-#                         between(v_spo2, 90,94) ~ '90-94',
-#                            v_spo2 > 94 ~ '> 94',
-#                       TRUE ~ NA_character_),
-# spo2_cat3 = factor(spo2_cat3, ordered = TRUE, levels = c("< 90","90-94","> 94"), labels = c("< 90","90-94","> 94")),
-# 
-# FIO2_cat = case_when(v_fio2 == 21 ~ '21',
-#                      between(v_fio2,21.001,40) ~ '21-40',
-#                      between(v_fio2,40.01,59.9999) ~ '40-60',
-#                      v_fio2 >= 60 ~ '> 60',
-#                      TRUE ~ NA_character_),
-# FIO2_cat = factor(FIO2_cat, ordered = TRUE, levels = c("21","21-40","40-60", "> 60"), labels = c("21","21-40","40-60", "> 60")),
-# 
-# PF_ratio = v_pO2/(v_fio2/100),
-# 
-# PF_ratio_cat = case_when(PF_ratio  >= 300 ~ '> 300',
-#                      between(PF_ratio,200,299.999) ~ '200-300',
-#                      between(PF_ratio,100,199.999) ~ '100-200',
-#                      PF_ratio < 100   ~ ' < 100',
-#                      TRUE ~ NA_character_),
-# PF_ratio_cat = factor(PF_ratio_cat, ordered = TRUE, levels = c("> 300","200-300","100-200", "< 100"), labels = c("> 300","200-300","100-200", "< 100")),
-# 
-# gcs_cat = case_when(v_gcs <=  8 ~ 'Severe',
-#                   between(v_gcs, 9,12) ~ 'Moderate',
-#                   between(v_gcs,13,15) ~ 'Mild',
-#                   v_gcs > 15 ~ 'Normal',
-#                   TRUE ~ NA_character_),
-# 
-# gcs_cat = factor(gcs_cat, ordered = TRUE, levels = c("Normal", "Mild","Moderate","Severe"), labels = c("Normal", "Mild","Moderate","Severe")),
-# 
-# neutro_lympho_n_ratio = v_neutro_n/v_lymph_n,
-# neutro_lympho_perc_ratio = v_neutro_perc/v_lymph_perc,
-# month_period = lubridate::month(start_date),
-# 
-# event_cat = if_else(censoring2==1, "Died", "Recovered/Discharged alive")
+patterns1_num = if_else(patterns1=='Abnormal', 1, 0),
+patterns2_num = if_else(patterns2=='Abnormal', 1, 0)
 )
 
 
@@ -241,10 +160,10 @@ number_comorbid_cat3 = factor(number_comorbid_cat3, ordered = TRUE, levels = c("
 # Liberal definition (Def1)
 
 ```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
-#Original PCR data set (125,747)
+#Original PCR data set (N=71,870)
 prev_CI(df_pcr_org,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
 
-#Derived data set (N=16,472)
+#Derived data set (N=14,554)
 prev_CI(df,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
 
 ```
@@ -268,10 +187,10 @@ demoTable_By(df_r=df.test, cols_r=cols_vec, labels_r=labs_vec , by_varname='patt
 # Conservative definition (Def2)
 
 ```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, comment=TRUE, paged.print=FALSE}
-#Original PCR data set (125,747)
+#Original PCR data set (N=71,870)
 prev_CI(df_pcr_org,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
 
-#Derived data set (N=16,472)
+#Derived data set (N=14,554)
 prev_CI(df,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
 ```
 

@@ -14,32 +14,24 @@ path_data = paste0(getwd(),"/1_data")
 ###################
 #A. Read Data  ####
 ###################
-
+#Read Risk factors
 df_riskfac <- read_csv("1_data/final/seha_comorbidity_ext_mar_dec_2020.csv")
 df_riskfac <- df_riskfac %>% group_by(PERS_ID) %>% slice(1) %>% ungroup() 
-df_riskfac <- df_riskfac %>% extract(AGE, c('age','age_mea'), regex = "(.*)\\s(.*)", remove = FALSE) %>% 
+df_riskfac <- df_riskfac %>% 
+  tidyr::extract(AGE, c('age','age_mea'), regex = "(.*)\\s(.*)", remove = FALSE) %>% 
   filter(age_mea %in% c('Years') & as.numeric(age)>=18) 
 
-
+#Read PCR Tests
 fls_nms <- list.files(paste0(path_data,'/final'), pattern = ".*_\\d.csv") %>% setNames(.,nm = gsub('\\D+','',.))
 
 df0 <- map_df(fls_nms,
                ~read_csv(paste0(path_data,'/final/',.x),
                          col_types = cols(DATE_COLLECTED = col_datetime(format = "%m/%d/%Y %H:%M:%S"), 
                                           RESULT_PERFORMED_DT = col_datetime(format = "%m/%d/%Y %H:%M:%S"), 
-                                          RESULT_VERIFY_DATE = col_datetime(format = "%m/%d/%Y %H:%M:%S"))) %>%
-                filter(PERSON_ID %in% df_riskfac$PERS_ID),
+                                          RESULT_VERIFY_DATE = col_datetime(format = "%m/%d/%Y %H:%M:%S"))) ,
                .id = "part")
 
-# df0 <- map_df(fls_nms,
-#               ~read_csv(paste0(path_data,'/final/',.x),
-#                         col_types = cols(DATE_COLLECTED = col_datetime(format = "%m/%d/%Y %H:%M:%S"), 
-#                                          RESULT_PERFORMED_DT = col_datetime(format = "%m/%d/%Y %H:%M:%S"), 
-#                                          RESULT_VERIFY_DATE = col_datetime(format = "%m/%d/%Y %H:%M:%S")))
-#               ,.id = "part")
-
 ids_missing <- base::setdiff(df_riskfac$PERS_ID, df0$PERSON_ID)
-
 
 df0 <- df0 %>% 
   mutate(RESULT_num = case_when(RESULT %in% c('2019-nCoV NOT DETECTED', 'NEG', 'Not Detected') ~ 0,
@@ -52,9 +44,11 @@ df0 <- df0 %>%
   group_by(PERSON_ID) %>% 
   arrange(DATE_COLLECTED, .by_group=TRUE) %>% ungroup()
 
-#Choose only ASSAY is CoViD19 RT-PCR and non-missing RESULT_num & DATE_COLLECTED
+#Choose only ASSAY is CoViD19 RT-PCR and non-missing RESULT_num & DATE_COLLECTED $ number of visitis >= 3
 df1 <- df0 %>% filter(ASSAY_num==1 & !is.na(RESULT_num) & !is.na(DATE_COLLECTED)) %>% 
-  distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE)
+  distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE) %>%
+  group_by(PERSON_ID) %>%
+  filter(n()>=3)
 
 df2 <- df1 %>% group_by(PERSON_ID) %>% mutate(flag=cumsum(RESULT_num==1)) %>% 
   filter(flag>=1) %>% 
@@ -65,20 +59,21 @@ df2 <- df1 %>% group_by(PERSON_ID) %>% mutate(flag=cumsum(RESULT_num==1)) %>%
                              TRUE ~ 'Normal')) %>% 
   ungroup() 
 
+df2_ep1 <- group_by(df2, PERSON_ID) %>% slice(1)
+
 # df3 <- df2 %>% filter(patterns == "Abnormal") %>% group_by(PERSON_ID) %>% 
 #   group_modify(~cal_timediff(df_r = .x)) %>% 
 #   ungroup()
 
-df2_ep1 <- group_by(df2, PERSON_ID) %>% slice(1)
-
-
-df3 <- df2_ep1 %>% left_join(df_riskfac, by=c('PERSON_ID'='PERS_ID'))
-
+df3 <- df2_ep1 %>% inner_join(df_riskfac, by=c('PERSON_ID'='PERS_ID'))
 
 ############################
 #Write data to disk
 ###########################
+#PCR Tests
+write.csv(df2,file = "1_data/df_long_fullPCRtests.csv", row.names = FALSE)
+write.csv(df2_ep1,file = "1_data/df_ep1_fullPCRtests.csv", row.names = FALSE)
 
-write.csv(df2,file = "1_data/df_long.csv", row.names = FALSE)
+#PCR Tests + Risk factors
 write.csv(df3,file = "1_data/df_ep1.csv", row.names = FALSE)
-#write.csv(group_by(df2, PERSON_ID) %>% slice(1),file = "1_data/df_long_fullPCRtests.csv", row.names = FALSE)
+
