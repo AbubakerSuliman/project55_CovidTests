@@ -1,0 +1,295 @@
+---
+title: 'Repeated PCR Analysis'
+subtitle: ''
+author: |
+  | `r paste0("Abderrahim Oulhaj, PhD & MsC") `
+  | `r paste0("Associate Professor in Biostatistics") `
+  | `r paste0("Institute of Public Health") `
+  | `r paste0("College of Medecine and Health Sciences") `
+  | `r paste0("United Arab Emirates University") `
+date: |
+  | `r format(Sys.time(), '%d %B, %Y')`
+output:
+  html_document:
+    number_sections: yes
+    theme: lumen
+    toc: yes
+    toc_collapsed: yes
+    toc_float: yes
+  pdf_document:
+    highlight: pygments
+    keep_tex: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+header-includes:
+- \usepackage{colortbl}
+- \usepackage{placeins}
+---
+<style>
+  #TOC {
+  /*position: fixed;
+left: 0;
+top: 0;*/
+  width: 400px;
+/*height: 100%;
+overflow:auto;*/
+  }
+h1.title {
+  font-size: 38px;
+ // color: DarkRed;
+}
+h1 { /* Header 1 */
+  font-size: 28px;
+  color: DarkBlue;
+}
+h2 { /* Header 2 */
+    font-size: 22px;
+  color: DarkBlue;
+}
+
+h3 { /* Header 3 */
+    font-size: 20px;
+  color: DarkBlue;
+}
+</style>
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, cache=FALSE, warning=FALSE, message = FALSE)
+
+#A. Paths
+path_global = switch(Sys.info()[['user']],
+                     "ababaker.suliman" = "C:/Abubaker/RFunctions",
+                     "D:/Oulhaj/4_Research/00000_My_Projects/RFunctions"
+                     )
+
+path_local = dirname(getwd())  #This is the path for the project#
+
+#B. Libraries
+library(tidyverse)
+library(survival)
+library(survminer) #for ggsurvplot, ggcoxzph, ggcoxdiagnostics, ggcoxfunctional
+library(directlabels) #for geom_dl which creates labels at the end of KM plot
+library(Gmisc)
+library(dplyr)
+library(ggplot2)
+library(purrr) #for map and map2
+library(mice) #for md.pattern
+library(hdnom)
+library(rms) #for survplot,npsurv
+library(pec) #for selectCox stepwsie procedure using pval and aic #
+library(cmprsk) #competing risk analysis#
+library(MatchIt) #propensity scores#
+library(ztable)
+library(fastDummies) #split multinomail factor into dummies binary# 
+library(R.utils) #for function insert#
+library(standardize) #standardise propensity score = distance#
+library(knitr) 
+library(kableExtra)
+library(riskRegression)
+library(crrstep) #stepwise #
+library(lubridate)
+
+#C. Function
+source(paste0(path_local,"/2_programs/functions.R"))
+source(paste0(path_global,"/0_programs/DemoTables.R"))
+source(paste0(path_global,"/0_programs/graphs.R"))
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE }
+#D. Read the final Dataset
+# set_seed_r = 123
+# train_perc = 0.6
+
+df <- read.csv(paste0(path_local,"/1_data/df_ep1.csv"), stringsAsFactors=FALSE, na.strings = c("N/A","","NA"))
+
+df_pcr_org <- read.csv(paste0(path_local,"/1_data/df_ep1_fullPCRtests.csv"), stringsAsFactors=FALSE, na.strings = c("N/A","","NA"))
+
+###################
+#Define covariates#
+###################
+
+#Recode variables#
+
+df <- df %>% rename(gender=GENDER, Ischemic=ISCHEMIC)
+
+df = df %>% mutate(
+#1. Demographics and commorbidities#
+
+age_cat = case_when(age < 50 ~ '< 50 years',
+                  age >= 50 ~ '>= 50 years',
+                  TRUE ~ NA_character_),
+bmi=case_when(BMI==-10000 | BMI>1000 | BMI==0 ~ NA_real_,
+              is.na(BMI) & !is.na(HEIGHT) & !is.na(WEIGHT) ~ as.numeric(str_extract(WEIGHT, '\\d+\\.*\\d+')) / ((as.numeric(str_extract(HEIGHT, '\\d+\\.*\\d+'))/100)^2),
+              TRUE ~ BMI),
+bmi_cat = case_when(bmi < 30 ~ '< 30',
+                  bmi >= 30 ~ '>= 30',
+                  TRUE ~ NA_character_),
+bmi_cat3 = case_when(bmi < 20 ~ 'Underweight',
+                  between(bmi,20,25) ~ 'Normal',
+                  between(bmi,25.01,29.999) ~ 'Overweight',
+                  bmi >= 30 ~ 'Obeise',
+                  TRUE ~ NA_character_),
+gender = case_when(gender %in% c("Female", "Male") ~ gender, TRUE ~ NA_character_ ),
+gender_num = case_when(gender %in% "Female" ~ 1, gender %in% "Male" ~ 0, TRUE ~ NA_real_ ),
+diabetes_num = case_when(DM %in% "Yes" ~ 1, DM %in% "No" ~ 0, TRUE ~ NA_real_),
+cad_num = case_when(CAD %in% "Yes" ~ 1, CAD %in% "No" ~ 0, TRUE ~ NA_real_),
+htn_num = case_when(HTN %in% "Yes" ~ 1, HTN %in% "No" ~ 0, TRUE ~ NA_real_),
+ckd_num = case_when(CKD %in% "Yes" ~ 1, CKD %in% "No" ~ 0, TRUE ~ NA_real_),
+#asthma_num = case_when(Asthma %in% "Yes" ~ 1, Asthma %in% "No" ~ 0, TRUE ~ NA_real_),
+ischemic_num = case_when(Ischemic %in% "Yes" ~ 1, Ischemic %in% "No" ~ 0, TRUE ~ NA_real_),
+#copd_num = case_when(COPD %in% "Yes" ~ 1, COPD %in% "No" ~ 0, TRUE ~ NA_real_),
+esrd_num = case_when(ESRD %in% "Yes" ~ 1, ESRD %in% "No" ~ 0, TRUE ~ NA_real_),
+comorbid_num = if_else(diabetes_num == 1 | cad_num==1 | htn_num ==1 | ckd_num ==1 | ischemic_num==1 | esrd_num==1, 1, 0),
+number_comorbid_num = diabetes_num  + cad_num + htn_num + ckd_num + ischemic_num + esrd_num,
+number_comorbid_cat3 = case_when(number_comorbid_num <= 0 ~ '0',
+                                 number_comorbid_num == 1 ~ '1',
+                                 number_comorbid_num > 1 ~ '>= 2',
+                                 TRUE ~ NA_character_),
+
+number_comorbid_cat3 = factor(number_comorbid_cat3, ordered = TRUE, levels = c("0","1",">= 2"), labels = c("0","1",">= 2")),
+
+
+#2. Oxygen#
+#########################################
+#2.1. Oxygen therapy close to start_date#
+#########################################
+
+# v_ox_therapy = case_when(v_ox_therapy %in% cat1 ~ "1",v_ox_therapy %in%  cat2 ~ "2" , v_ox_therapy %in% cat3 ~ "3",  v_ox_therapy %in% cat4 ~ "4", TRUE ~ NA_character_),
+# v_ox_therapy_ord = factor(v_ox_therapy, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+# #2.2. Oxygen therapy max at 12 and 24h#
+# ox_th_24_max_code_ord = factor(ox_th_24_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+# ox_th_12_max_code_ord = factor(ox_th_12_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+
+#################################################
+#2.3. Oxygen therapy titrated close to start_date
+#################################################
+
+# v_ox_therapy_titrated = case_when(v_Oxygen_Therapy_Titrated %in% cat1 ~ "1",v_ox_therapy %in%  cat2 ~ "2" , v_ox_therapy %in% cat3 ~ "3",  v_ox_therapy %in% cat4 ~ "4", TRUE ~ NA_character_),
+# v_ox_therapy_titrated_ord = factor(v_ox_therapy_titrated, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+# 
+# #2.3. Oxygen therapy titrated max at 12 and 24h#
+# ox_th_tit_24_max_code_ord = factor(ox_th_tit_24_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+# ox_th_tit_12_max_code_ord = factor(ox_th_tit_12_max_code, ordered = TRUE, levels = c("1","2","3", "4"), labels = c("Not requiring SO","Requiring SO", "Requiring NHF, NIMV or both", "Requiring ECMO, IMV or both")),
+# 
+#######################
+#2.4. Oxygen flow rate#
+#######################
+
+# v_oxygen_status = case_when(v_ox_flow_rate == 0 ~ 'Not requiring oxygen',
+#           v_ox_flow_rate > 0 ~ 'Requiring oxygen',
+#           TRUE ~ NA_character_),
+# #2.4. Oxygen flow rate max at 12 and 24h#
+# oxygen_status_12_max = case_when(ox_flow_12_max_value == 0 ~ 'Not requiring SO',
+#           v_ox_flow_rate > 0 ~ 'Requiring SO',
+#           TRUE ~ NA_character_),
+# oxygen_status_24_max = case_when(ox_flow_24_max_value == 0 ~ 'Not requiring SO',
+#           v_ox_flow_rate > 0 ~ 'Requiring SO',
+#           TRUE ~ NA_character_),
+
+#### Vitals ##############
+# v_mews_tot = case_when(v_mews_tot <= 4 ~ '1',v_mews_tot %in% c('5','6') ~ '2', v_mews_tot >= 7 ~ '3', TRUE ~ NA_character_) ,
+# v_mews_tot = factor(v_mews_tot, ordered = TRUE, levels = c("1","2","3"), labels = c("Low","Medium","High")),
+# 
+# spo2_94 = case_when(v_spo2 <= 94 ~ '< 94',
+#                            v_spo2 > 94 ~ '> 94',
+#                       TRUE ~ NA_character_),
+# spo2_90 = case_when(v_spo2 < 90 ~ '< 90',
+#                            v_spo2 >= 90 ~ '> 90',
+#                       TRUE ~ NA_character_),
+# spo2_cat3 = case_when(v_spo2 < 90 ~ '< 90',
+#                         between(v_spo2, 90,94) ~ '90-94',
+#                            v_spo2 > 94 ~ '> 94',
+#                       TRUE ~ NA_character_),
+# spo2_cat3 = factor(spo2_cat3, ordered = TRUE, levels = c("< 90","90-94","> 94"), labels = c("< 90","90-94","> 94")),
+# 
+# FIO2_cat = case_when(v_fio2 == 21 ~ '21',
+#                      between(v_fio2,21.001,40) ~ '21-40',
+#                      between(v_fio2,40.01,59.9999) ~ '40-60',
+#                      v_fio2 >= 60 ~ '> 60',
+#                      TRUE ~ NA_character_),
+# FIO2_cat = factor(FIO2_cat, ordered = TRUE, levels = c("21","21-40","40-60", "> 60"), labels = c("21","21-40","40-60", "> 60")),
+# 
+# PF_ratio = v_pO2/(v_fio2/100),
+# 
+# PF_ratio_cat = case_when(PF_ratio  >= 300 ~ '> 300',
+#                      between(PF_ratio,200,299.999) ~ '200-300',
+#                      between(PF_ratio,100,199.999) ~ '100-200',
+#                      PF_ratio < 100   ~ ' < 100',
+#                      TRUE ~ NA_character_),
+# PF_ratio_cat = factor(PF_ratio_cat, ordered = TRUE, levels = c("> 300","200-300","100-200", "< 100"), labels = c("> 300","200-300","100-200", "< 100")),
+# 
+# gcs_cat = case_when(v_gcs <=  8 ~ 'Severe',
+#                   between(v_gcs, 9,12) ~ 'Moderate',
+#                   between(v_gcs,13,15) ~ 'Mild',
+#                   v_gcs > 15 ~ 'Normal',
+#                   TRUE ~ NA_character_),
+# 
+# gcs_cat = factor(gcs_cat, ordered = TRUE, levels = c("Normal", "Mild","Moderate","Severe"), labels = c("Normal", "Mild","Moderate","Severe")),
+# 
+# neutro_lympho_n_ratio = v_neutro_n/v_lymph_n,
+# neutro_lympho_perc_ratio = v_neutro_perc/v_lymph_perc,
+# month_period = lubridate::month(start_date),
+# 
+# event_cat = if_else(censoring2==1, "Died", "Recovered/Discharged alive")
+)
+
+
+```
+
+
+# Liberal definition (Def1)
+
+```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
+#Original PCR data set (125,747)
+prev_CI(df_pcr_org,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
+
+#Derived data set (N=16,472)
+prev_CI(df,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
+
+```
+
+## Demographics and commorbidities
+```{r, results='asis', echo=FALSE, cache=FALSE,  warning=FALSE, comment=FALSE, warning=FALSE, message = FALSE}
+options(ztable.type="latex") 
+
+df.test = df
+#Make categorical variables as factor #
+vars_cat = c("gender", "DM", "HTN", "CAD", "CKD", "ESRD","Ischemic", "number_comorbid_num", "number_comorbid_cat3")
+df.test[,vars_cat] <- lapply(df.test[,vars_cat] , function(x)(factor(x)) )
+
+cols_vec = c("age", "gender", "DM", "HTN", "CAD", "CKD", "ESRD","Ischemic", "number_comorbid_num", "number_comorbid_cat3")
+labs_vec = c("Age", "Gender","Diabetes", "Hypertention",  "CAD", "CKD", "ESRD","Ischemic", "Number of commorbidities ", "Commorbidity categories")
+
+rm(vars_cat) 
+demoTable_By(df_r=df.test, cols_r=cols_vec, labels_r=labs_vec , by_varname='patterns1',caption = "Table 1. Demographics and commorbidity ", html_out=TRUE, out_sort=FALSE,hrzl=FALSE,pval=TRUE,range_include=FALSE, digits_r=2, tfoot_r='&dagger; Continuous variables were summarized using the T-test, while discrete variables were summarized using the Chi-square test.',useNA_r="no") 
+```
+
+# Conservative definition (Def2)
+
+```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, comment=TRUE, paged.print=FALSE}
+#Original PCR data set (125,747)
+prev_CI(df_pcr_org,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
+
+#Derived data set (N=16,472)
+prev_CI(df,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
+```
+
+## Demographics and commorbidities
+```{r, results='asis', echo=FALSE, cache=FALSE,  warning=FALSE, comment=FALSE, warning=FALSE, message = FALSE}
+options(ztable.type="latex") 
+
+df.test = df
+#Make categorical variables as factor #
+vars_cat = c("gender", "DM", "HTN", "CAD", "CKD", "ESRD","Ischemic", "number_comorbid_num", "number_comorbid_cat3")
+df.test[,vars_cat] <- lapply(df.test[,vars_cat] , function(x)(factor(x)) )
+
+cols_vec = c("age", "gender", "DM", "HTN", "CAD", "CKD", "ESRD","Ischemic", "number_comorbid_num", "number_comorbid_cat3")
+labs_vec = c("Age", "Gender","Diabetes", "Hypertention",  "CAD", "CKD", "ESRD","Ischemic", "Number of commorbidities ", "Commorbidity categories")
+
+rm(vars_cat) 
+demoTable_By(df_r=df.test, cols_r=cols_vec, labels_r=labs_vec , by_varname='patterns2',caption = "Table 1. Demographics and commorbidity ", html_out=TRUE, out_sort=FALSE,hrzl=FALSE,pval=TRUE,range_include=FALSE, digits_r=2, tfoot_r='&dagger; Continuous variables were summarized using the T-test, while discrete variables were summarized using the Chi-square test.',useNA_r="no") 
+```
+
+
+
