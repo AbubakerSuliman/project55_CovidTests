@@ -159,12 +159,12 @@ patterns2_num = if_else(patterns2=='Abnormal', 1, 0)
 
 # Liberal definition (Def1)
 
-```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
+```{r echo=FALSE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
 #Original PCR data set (N=71,870)
-prev_CI(df_pcr_org,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
+prev_CI(df_pcr_org,'patterns1',varlabel = 'Def 1: Original PCR data set (N=71,870)', succes_code = 'Abnormal')
 
 #Derived data set (N=14,554)
-prev_CI(df,'patterns1',varlabel = 'Def 1', succes_code = 'Abnormal')
+prev_CI(df,'patterns1',varlabel = 'Def 1: Derived data set (N=14,554)', succes_code = 'Abnormal')
 
 ```
 
@@ -186,12 +186,12 @@ demoTable_By(df_r=df.test, cols_r=cols_vec, labels_r=labs_vec , by_varname='patt
 
 # Conservative definition (Def2)
 
-```{r echo=TRUE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, comment=TRUE, paged.print=FALSE}
+```{r echo=FALSE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
 #Original PCR data set (N=71,870)
-prev_CI(df_pcr_org,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
+prev_CI(df_pcr_org,'patterns2',varlabel = 'Def 2: Original PCR data set (N=71,870)', succes_code = 'Abnormal')
 
 #Derived data set (N=14,554)
-prev_CI(df,'patterns2',varlabel = 'Def 2', succes_code = 'Abnormal')
+prev_CI(df,'patterns2',varlabel = 'Def 2: Derived data set (N=14,554)', succes_code = 'Abnormal')
 ```
 
 ## Demographics and commorbidities
