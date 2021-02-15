@@ -46,12 +46,11 @@ df0 <- df0 %>%
 
 #Choose only ASSAY is CoViD19 RT-PCR and non-missing RESULT_num & DATE_COLLECTED $ number of visitis >= 3
 df1 <- df0 %>% filter(ASSAY_num==1 & !is.na(RESULT_num) & !is.na(DATE_COLLECTED)) %>% 
-  distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE) %>%
-  group_by(PERSON_ID) %>%
-  filter(n()>=3)
+  distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE) 
 
 df2 <- df1 %>% group_by(PERSON_ID) %>% mutate(flag=cumsum(RESULT_num==1)) %>% 
   filter(flag>=1) %>% 
+  filter(n()>=3) %>%
   mutate(flag_seq=paste0(rle(RESULT_num)$values, collapse = ""),
          patterns1=case_when(flag_seq %in% c('1','10') ~ 'Normal',
                             TRUE ~ 'Abnormal'),

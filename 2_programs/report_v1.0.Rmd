@@ -187,18 +187,21 @@ demoTable_By(df_r=df.test, cols_r=cols_vec, labels_r=labs_vec , by_varname='patt
 # Conservative definition (Def2)
 
 ```{r echo=FALSE, fig.height=30, fig.width=20, message=FALSE, warning=FALSE, cache=FALSE, paged.print=FALSE}
+df_Pat2 <- filter(df, patterns2_num==1 | (patterns2_num==0 & patterns1_num==0))
+
+
 #Original PCR data set (N=71,870)
 prev_CI(df_pcr_org,'patterns2',varlabel = 'Def 2: Original PCR data set (N=71,870)', succes_code = 'Abnormal')
 
-#Derived data set (N=14,554)
-prev_CI(df,'patterns2',varlabel = 'Def 2: Derived data set (N=14,554)', succes_code = 'Abnormal')
+#Derived data set (N=11,379)
+prev_CI(df_Pat2,'patterns2',varlabel = 'Def 2: Derived data set (N=11,379)', succes_code = 'Abnormal')
 ```
 
 ## Demographics and commorbidities
 ```{r, results='asis', echo=FALSE, cache=FALSE,  warning=FALSE, comment=FALSE, warning=FALSE, message = FALSE}
 options(ztable.type="latex") 
 
-df.test = df
+df.test = df_Pat2
 #Make categorical variables as factor #
 vars_cat = c("gender", "DM", "HTN", "CAD", "CKD", "ESRD","Ischemic", "number_comorbid_num", "number_comorbid_cat3")
 df.test[,vars_cat] <- lapply(df.test[,vars_cat] , function(x)(factor(x)) )

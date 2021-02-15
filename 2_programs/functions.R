@@ -17,3 +17,30 @@ cal_timediff <- function(df_r) {
     
   }
 }
+
+##################################################################
+# PCR PATTERNS ###################################################
+##################################################################
+rl <- function(x){
+  #browser()
+  rl <- rle(x)
+  
+  if(first(rl$values)==1 & last(rl$values)==0){
+    p1 <- switch(as.character(length(rl$values)==2),
+                 "TRUE" = "1;0|1,0",
+                 "FALSE" = "1;0|1,x,0"
+    )
+  } else if(first(rl$values)==1 & last(rl$values)==1){
+    p1 <- switch(as.character(n_distinct(rl$values)==1),
+                 "TRUE" = "1;1|1,1",
+                 "FALSE" = "1;1|1,x,1"
+    )
+  } else {
+    p1 <- 'Not Defined|Not Defined'
+  }
+  
+  p2 <- paste0("{",rl$values,":",ifelse(rl$lengths==1,"1","\u22652"),"}", collapse = " ")
+  
+  return(paste0(p1,"|",p2))
+  
+}
