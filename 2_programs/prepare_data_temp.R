@@ -1,9 +1,12 @@
+rm(list = ls())
 ###############
 #Libraries#####
 ###############
 library(tidyverse)
 library(openxlsx)
 library(readr)
+library(lubridate)
+library(rollmatch)
 
 #Function
 source("2_programs/functions.R")
@@ -29,27 +32,72 @@ df0 <- df0 %>%
 
 #Remove duplicate PCR according to date collected #
 
-df0 = df0 %>% group_by(PERSON_ID,DATE_COLLECTED) %>% slice(1) 
-
+#df0 = df0 %>% group_by(PERSON_ID,DATE_COLLECTED) %>% slice(1) 
 
 #assign random treatment for each person#
 
 sub = df0 %>% pull(PERSON_ID) %>% unique()
 sub_treat1 = sample(sub,length(sub)/2,replace=FALSE)
 sub_treat0 = setdiff(sub,sub_treat1)
-
 df1 = df0 %>% mutate(treat = if_else(PERSON_ID %in% sub_treat1, 1,0))
 
-#create the time period#
-min_date = min(na.omit(df1$DATE_COLLECTED)) 
-df1 = df1 %>% mutate(time0 = as.numeric(as.character(difftime(as.Date(DATE_COLLECTED), as.Date(min_date), units = "days")))  )
-#create date of vaccine for treat#
+#Initial data to be received#
+df1.1 = df1 %>% filter(treat==1)
+df1.2 = df1.1 %>% group_by(PERSON_ID)  %>%  summarise(dose1_date = as.Date(median(DATE_COLLECTED))) %>% filter(!is.na(dose1_date))
+df0.1 = df1 %>% filter(treat==0)
 
-#create entry period for treated and for controls#
+#Clean the data first#
 
-df1.0 = df1 %>% group_by(treat, PERSON_ID) %>% 
+df1.1 = df1.1 %>% mutate(DATE_COLLECTED = as.Date(DATE_COLLECTED)) %>% filter(year(DATE_COLLECTED) >= 2020)
+df0.1 = df0.1 %>% mutate(DATE_COLLECTED = as.Date(DATE_COLLECTED)) %>% filter(year(DATE_COLLECTED) >= 2020)
+df1.2 = df1.2 %>% mutate(dose1_date = as.Date(dose1_date)) %>% filter(dose1_date > ymd("2020-01-01"))
 
-#Create matching#
+#Choose only ASSAY is CoViD19 RT-PCR and non-missing RESULT_num & DATE_COLLECTED
+df1.1 <- df1.1 %>% filter(ASSAY_num==1 & !is.na(RESULT_num) & !is.na(DATE_COLLECTED)) %>% distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE) 
+df0.1 <- df0.1 %>% filter(ASSAY_num==1 & !is.na(RESULT_num) & !is.na(DATE_COLLECTED)) %>% distinct(PERSON_ID, DATE_COLLECTED, .keep_all = TRUE) 
+
+#Add entry date for treated#
+df1.1 = df1.1 %>% left_join(df1.2,  c("PERSON_ID"="PERSON_ID"))
+#merge treated with controls#
+df1  = bind_rows(df1.1, df0.1)
+
+#create the time period for all#
+min_vaccine_date = as.Date(min(na.omit(df1[df1$treat==1,]$dose1_date)) )
+df1 = df1 %>% mutate(time0 = 1 + round(as.numeric(as.character(difftime(as.Date(DATE_COLLECTED), as.Date(min_vaccine_date), units = "days"))))  )
+
+#check there is no duplicate time0 per ID#
+
+sub = df1  %>% group_by(PERSON_ID, time0) %>% filter(n() > 1)
+
+#create entry time for all#
+df2 = df1 %>% group_by(PERSON_ID) %>% mutate(entry_time = if_else(treat==1, 1 + round(as.numeric(as.character(difftime(dose1_date, min_vaccine_date, units = "days")))), 2 + round(as.numeric(as.character(difftime(DATE_COLLECTED, min_vaccine_date, units = "days")))) )) %>% ungroup()
+
+df3 = df2 %>% filter(time0 > 0 & !is.na(entry_time) & entry_time > 0)
+
+#First matching#
+library(rollmatch)
+reduced_data <- rollmatch::reduce_data(data = df3, treat = "treat",tm = "time0", entry = "entry_time",id = "PERSON_ID", lookback = 1)
+fm <- as.formula(treat ~ RESULT_num)
+vars <- all.vars(fm)
+
+scored_data <- score_data(reduced_data = reduced_data,
+                          model_type = "logistic", match_on = "logit",
+                          fm = fm, treat = "treat",
+                          tm = "time0", entry = "entry_time", id = "PERSON_ID")
+
+
+output <- rollmatch(scored_data, data=df3, treat = "treat",
+                    tm = "time0", entry = "entry_time", id = "PERSON_ID",
+                    vars = vars, lookback = 1, alpha = .2,
+                    standard_deviation = "average", num_matches = 1,
+                    replacement = FALSE)
+
+
+
+
+
+
+
 
 
 #Choose only ASSAY is CoViD19 RT-PCR and non-missing RESULT_num & DATE_COLLECTED
